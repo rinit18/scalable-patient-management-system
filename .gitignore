@@ -1,0 +1,37 @@
+# ======================
+# IDE files
+# ======================
+.idea/
+*.iml
+.vscode/
+
+# ======================
+# Build folders
+# ======================
+target/
+build/
+.gradle/
+
+# ======================
+# Docker / database volumes
+# ======================
+Db_volumes/
+
+# ======================
+# OS junk
+# ======================
+.DS_Store
+Thumbs.db
+
+# ======================
+# Logs
+# ======================
+*.log
+
+# ======================
+# Environment secrets
+# ======================
+.env
+# AWS CDK build output
+cdk.out/
+infrastructure/cdk.out/

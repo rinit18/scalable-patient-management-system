@@ -1,0 +1,13 @@
+### update request
+PUT http://localhost:4000/api/patients/123e4567-e89b-12d3-a456-426614174000
+Content-Type: application/json
+
+{
+  "name" : "Lord Bhowmick",
+  "email": "lord@gmail.com",
+  "address": "uluberia kolkata",
+  "dateOfBirth": "1999-06-13"
+
+
+}
+###

@@ -1,0 +1,13 @@
+### create request
+POST http://localhost:4004/api/patients
+Content-Type: application/json
+
+{
+
+  "name": "Soham Das",
+  "email": "soham.das.dev04@example.com",
+  "address": "Uluberia, Kolkata, West Bengal",
+  "dateOfBirth": "1999-06-14"
+
+}
+###
