@@ -116,6 +116,18 @@ End-to-end tests validate authentication and patient workflows through the gatew
 
 ---
 
+## CI Pipeline (GitHub Actions)
+
+The repository includes a multi-stage CI pipeline under `.github/workflows`:
+
+- `maven.yml` builds each microservice with a Maven matrix on `push` and `pull_request` to `main`.
+- `docker-build.yml` builds Docker images for each service on `push` to `main`.
+- `integration-test.yml` brings up the stack with Docker Compose, waits for the gateway, runs `integration-tests`, then tears down the containers.
+
+If you add or rename a service, update the workflow matrices so CI stays in sync.
+
+---
+
 ## API Documentation
 
 - Patient Service → http://localhost:4000/swagger-ui/index.html
