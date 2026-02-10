@@ -1,0 +1,29 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build containers
+        run: docker compose build
+
+      - name: Start services
+        run: docker compose up -d
+
+      - name: Wait for startup
+        run: sleep 40
+
+      - name: Run integration tests
+        run: |
+          cd integration-tests
+          mvn test
+
+      - name: Stop services
+        run: docker compose down
