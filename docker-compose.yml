@@ -18,7 +18,6 @@ services:
 
   auth-service:
     build: ./auth-service
-    container_name: auth-service
     ports:
       - "4005:4005"
     environment:
@@ -26,13 +25,11 @@ services:
 
   billing-service:
     build: ./billing-service
-    container_name: billing-service
     ports:
       - "9001:9001"
 
   patient-service:
     build: ./patient-service
-    container_name: patient-service
     depends_on:
       - kafka
       - billing-service
@@ -44,7 +41,6 @@ services:
 
   analytics-service:
     build: ./analytics-service
-    container_name: analytics-service
     depends_on:
       - kafka
     environment:
@@ -52,7 +48,6 @@ services:
 
   api-gateway:
     build: ./api-gateway
-    container_name: api-gateway
     depends_on:
       - auth-service
       - patient-service

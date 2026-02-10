@@ -5,8 +5,6 @@ spring:
   cloud:
     gateway:
       routes:
-        ## http://localhost:4004/auth/login
-        ## API GATEWAY -> http://auth-service:4005/login
         - id: auth-service-route
           uri: http://auth-service:4005
           predicates:
@@ -35,3 +33,9 @@ spring:
             - Path=/api-docs/auth
           filters:
             - RewritePath=/api-docs/auth,/v3/api-docs
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
