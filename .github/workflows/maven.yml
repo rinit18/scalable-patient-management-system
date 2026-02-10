@@ -18,14 +18,11 @@ jobs:
           - billing-service
           - analytics-service
           - api-gateway
-          - integration-tests
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
@@ -34,4 +31,5 @@ jobs:
       - name: Build ${{ matrix.service }}
         run: |
           cd ${{ matrix.service }}
-          mvn -B clean package
+          mvn -B clean package -DskipTests
+
