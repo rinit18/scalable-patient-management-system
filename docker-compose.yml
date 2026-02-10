@@ -2,6 +2,10 @@ version: "3.9"
 
 services:
 
+  # -------------------------
+  # Infrastructure
+  # -------------------------
+
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
@@ -11,17 +15,58 @@ services:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
       - zookeeper
+    ports:
+      - "9092:9092"
     environment:
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  # -------------------------
+  # Databases
+  # -------------------------
+
+  auth-db:
+    image: postgres:15
+    container_name: auth-db
+    environment:
+      POSTGRES_DB: authdb
+      POSTGRES_USER: admin_user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5001:5432"
+
+  patient-db:
+    image: postgres:15
+    container_name: patient-db
+    environment:
+      POSTGRES_DB: patientdb
+      POSTGRES_USER: admin_user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5000:5432"
+
+  # -------------------------
+  # Microservices
+  # -------------------------
 
   auth-service:
     build: ./auth-service
+    depends_on:
+      - auth-db
     ports:
       - "4005:4005"
     environment:
+<<<<<<< HEAD
       jwt.secret: YS12ZXJ5LXNlY3JldC1rZXktZm9yLWp3dC10b2tlbiE=
+=======
+      JWT_SECRET: "ee55c4b2f400cb8415f8efa582e356bd9e2cce4cbd0baf7033a71c7dd82920b6"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://auth-db:5432/authdb"
+      SPRING_DATASOURCE_USERNAME: "admin_user"
+      SPRING_DATASOURCE_PASSWORD: "password"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+      SPRING_SQL_INIT_MODE: "always"
+>>>>>>> e5e87dd (Fix JWT secret and update Docker Compose environment for integration tests)
 
   billing-service:
     build: ./billing-service
@@ -33,18 +78,24 @@ services:
     depends_on:
       - kafka
       - billing-service
+      - patient-db
     ports:
       - "4000:4000"
     environment:
-      spring.kafka.bootstrap-servers: kafka:9092
-      billing.service.address: billing-service
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://patient-db:5432/patientdb"
+      SPRING_DATASOURCE_USERNAME: "admin_user"
+      SPRING_DATASOURCE_PASSWORD: "password"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+      SPRING_SQL_INIT_MODE: "always"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+      BILLING_SERVICE_ADDRESS: "billing-service"
 
   analytics-service:
     build: ./analytics-service
     depends_on:
       - kafka
     environment:
-      spring.kafka.bootstrap-servers: kafka:9092
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
 
   api-gateway:
     build: ./api-gateway
@@ -54,4 +105,4 @@ services:
     ports:
       - "4004:4004"
     environment:
-      auth.service.url: http://auth-service:4005
+      AUTH_SERVICE_URL: "http://auth-service:4005"
