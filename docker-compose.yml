@@ -21,7 +21,7 @@ services:
     ports:
       - "4005:4005"
     environment:
-      jwt.secret: testsecret
+      jwt.secret: YS12ZXJ5LXNlY3JldC1rZXktZm9yLWp3dC10b2tlbiE=
 
   billing-service:
     build: ./billing-service
