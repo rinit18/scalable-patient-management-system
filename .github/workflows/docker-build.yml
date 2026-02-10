@@ -1,0 +1,28 @@
+name: Build Microservice Docker Images
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  docker-build:
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        service:
+          - api-gateway
+          - auth-service
+          - patient-service
+          - billing-service
+          - analytics-service
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            -t ${{ matrix.service }} \
+            ./${{ matrix.service }}
