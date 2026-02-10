@@ -57,16 +57,12 @@ services:
     ports:
       - "4005:4005"
     environment:
-<<<<<<< HEAD
-      jwt.secret: YS12ZXJ5LXNlY3JldC1rZXktZm9yLWp3dC10b2tlbiE=
-=======
       JWT_SECRET: "ee55c4b2f400cb8415f8efa582e356bd9e2cce4cbd0baf7033a71c7dd82920b6"
       SPRING_DATASOURCE_URL: "jdbc:postgresql://auth-db:5432/authdb"
       SPRING_DATASOURCE_USERNAME: "admin_user"
       SPRING_DATASOURCE_PASSWORD: "password"
       SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
       SPRING_SQL_INIT_MODE: "always"
->>>>>>> e5e87dd (Fix JWT secret and update Docker Compose environment for integration tests)
 
   billing-service:
     build: ./billing-service
