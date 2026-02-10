@@ -1,0 +1,62 @@
+version: "3.9"
+
+services:
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  auth-service:
+    build: ./auth-service
+    container_name: auth-service
+    ports:
+      - "4005:4005"
+    environment:
+      jwt.secret: testsecret
+
+  billing-service:
+    build: ./billing-service
+    container_name: billing-service
+    ports:
+      - "9001:9001"
+
+  patient-service:
+    build: ./patient-service
+    container_name: patient-service
+    depends_on:
+      - kafka
+      - billing-service
+    ports:
+      - "4000:4000"
+    environment:
+      spring.kafka.bootstrap-servers: kafka:9092
+      billing.service.address: billing-service
+
+  analytics-service:
+    build: ./analytics-service
+    container_name: analytics-service
+    depends_on:
+      - kafka
+    environment:
+      spring.kafka.bootstrap-servers: kafka:9092
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    depends_on:
+      - auth-service
+      - patient-service
+    ports:
+      - "4004:4004"
+    environment:
+      auth.service.url: http://auth-service:4005
