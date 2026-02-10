@@ -11,14 +11,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
       - name: Build containers
         run: docker compose build
 
       - name: Start services
         run: docker compose up -d
 
-      - name: Wait for startup
-        run: sleep 40
+      - name: Wait for API Gateway
+        run: |
+          for i in {1..30}; do
+            if curl -s http://localhost:4004 > /dev/null; then
+              echo "Services are up!"
+              break
+            fi
+            echo "Waiting for services..."
+            sleep 5
+          done
 
       - name: Run integration tests
         run: |
