@@ -1,6 +1,7 @@
 package com.rinit.patientservice.controller;
 
 
+import com.rinit.patientservice.dto.PagedPatientResponseDto;
 import com.rinit.patientservice.dto.PatientRequestDto;
 import com.rinit.patientservice.dto.PatientResponseDto;
 import com.rinit.patientservice.dto.validators.CreatePatientValidationGroup;
@@ -30,11 +31,16 @@ public class PatientController {
 
     @GetMapping
     @Operation(summary = "Get Patients")
-    public ResponseEntity<List<PatientResponseDto>> getPatient() {
+    public ResponseEntity<PagedPatientResponseDto> getPatient(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "asc") String sort,
+            @RequestParam(defaultValue = "name") String sortField,
+            @RequestParam(defaultValue = "") String searchValue
+    ) {
 
-        List<PatientResponseDto> patients = patientService.getpatients();
+        PagedPatientResponseDto patients = patientService.getpatients(page, size, sort, sortField , searchValue );
         return ResponseEntity.ok().body(patients);
-
 
     }
 

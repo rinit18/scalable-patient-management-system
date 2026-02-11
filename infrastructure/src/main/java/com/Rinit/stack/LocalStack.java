@@ -8,10 +8,13 @@ import software.amazon.awscdk.services.ec2.*;
 import software.amazon.awscdk.services.ec2.InstanceType;
 import software.amazon.awscdk.services.ecs.CloudMapNamespaceOptions;
 import software.amazon.awscdk.services.ecs.Cluster;
+import software.amazon.awscdk.services.ecs.FargateService;
 import software.amazon.awscdk.services.msk.CfnCluster;
 import software.amazon.awscdk.services.rds.*;
 import software.amazon.awscdk.services.route53.CfnHealthCheck;
 
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class LocalStack extends Stack {
@@ -99,6 +102,11 @@ public class LocalStack extends Stack {
                 .build();
 
     }
+
+    //private FargateService createFargateService(String id, String imageName, List<Integer> ports, DatabaseInstance db, Map<String, String> additionalEnvVars){
+
+
+   // }
 
     public static void main(final String[] args) {
 
