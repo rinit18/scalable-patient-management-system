@@ -22,6 +22,11 @@ services:
       KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  redis:
+    image: redis:latest
+    ports:
+      - 6379:6379
+
   # -------------------------
   # Databases
   # -------------------------
@@ -75,6 +80,7 @@ services:
       - kafka
       - billing-service
       - patient-db
+      - redis
     ports:
       - "4000:4000"
     environment:
@@ -85,6 +91,9 @@ services:
       SPRING_SQL_INIT_MODE: "always"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       BILLING_SERVICE_ADDRESS: "billing-service"
+      SPRING_CACHE_TYPE: redis
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: '6379'
 
   analytics-service:
     build: ./analytics-service
