@@ -1,5 +1,6 @@
 package com.rinit.patientservice.kafka;
 
+import billing.events.BillingAccountEvent;
 import com.rinit.patientservice.model.Patient;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -28,9 +29,23 @@ public class KafkaProducer {
      try {
          kafkaTemplate.send("patient",event.toByteArray());
      }catch (Exception e){
-         log.error("Error sending PatientCreated even : {}" , event);
+         log.error("Error sending PatientCreated event : {}" , event);
      }
 
-
  }
+
+    public void sendBillingAccountEvent(String patientId, String name, String email){
+
+        BillingAccountEvent event = BillingAccountEvent.newBuilder()
+                .setPatientId(patientId)
+                .setName(name)
+                .setEmail(email)
+                .setEventType("BILLIng ACCOUNT CREATE REQUESTED")
+                .build();
+        try {
+            kafkaTemplate.send("billing-account",event.toByteArray());
+        }catch (Exception e){
+            log.error("Error sending BillingAccountCreated event : {}" , event);
+        }
+    }
 }

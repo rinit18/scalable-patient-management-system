@@ -1,13 +1,14 @@
 ### create request
 POST http://localhost:4004/api/patients
 Content-Type: application/json
+Authorization: Bearer {{token}}
 
 {
+  "name": "Arjun Mehta",
+  "email": "arjun.mehta.dev94@example.com",
+  "address": "Baner, Pune, Maharashtra",
+  "dateOfBirth": "1992-11-03"
 
-  "name": "Soham Das",
-  "email": "soham.das.dev04@example.com",
-  "address": "Uluberia, Kolkata, West Bengal",
-  "dateOfBirth": "1999-06-14"
 
 }
 ###
