@@ -43,46 +43,54 @@ public class PatientService {
     @Cacheable(
             value = "patients",
             key = "#page + '-' + #size + '-' + #sort + '-' + #sortField",
-            condition = "#searchValue == ''"
-
+            condition = "#searchValue == null || #searchValue.isBlank()"
     )
-    public PagedPatientResponseDto getpatients(int page, int size, String sort, String sortField, String searchValue) {
+    public PagedPatientResponseDto getPatients(int page,
+                                               int size,
+                                               String sort,
+                                               String sortField,
+                                               String searchValue) {
 
-        log.info("[REDIS]: Cache miss - fetching from db");
+        log.info("Fetching patients: page={}, size={}, sort={}, field={}, search={}",
+                page, size, sort, sortField, searchValue);
 
-        try{
-            Thread.sleep(2000);
-        } catch (InterruptedException e) {
-            log.error(e.getMessage());
+        // ✅ Whitelist allowed sort fields
+        List<String> allowedSortFields = List.of("name", "email", "registeredDate");
+
+        if (!allowedSortFields.contains(sortField)) {
+            log.warn("Invalid sort field received: {}. Defaulting to 'name'", sortField);
+            sortField = "name";
         }
 
-        Pageable pageable = PageRequest.of(page - 1, size, sort.equalsIgnoreCase("desc") ? Sort.by(sortField).descending() : Sort.by(sortField).ascending());
+        // ✅ Safe sort direction
+        Sort.Direction direction = sort.equalsIgnoreCase("desc")
+                ? Sort.Direction.DESC
+                : Sort.Direction.ASC;
+
+        Pageable pageable = PageRequest.of(page - 1, size, Sort.by(direction, sortField));
 
         Page<Patient> patientPage;
 
         if (searchValue == null || searchValue.isBlank()) {
-
             patientPage = patientRepository.findAll(pageable);
-
         } else {
-
-            patientPage = patientRepository.findByNameContainingIgnoreCase(searchValue, pageable);
+            patientPage = patientRepository
+                    .findByNameContainingIgnoreCase(searchValue.trim(), pageable);
         }
 
-        List<PatientResponseDto> patientResponseDtos = patientPage.getContent()
-                .stream()
-                .map(PatientMapper::toDto)
-                .toList();
+        List<PatientResponseDto> patientResponseDtos =
+                patientPage.getContent()
+                        .stream()
+                        .map(PatientMapper::toDto)
+                        .toList();
 
         return new PagedPatientResponseDto(
                 patientResponseDtos,
-                patientPage.getNumber() +1,
+                patientPage.getNumber() + 1,
                 patientPage.getSize(),
                 patientPage.getTotalPages(),
-                (int)patientPage.getTotalElements()
-
+                (int) patientPage.getTotalElements()
         );
-
     }
 
     public PatientResponseDto createPatient(PatientRequestDto patientRequestDto){
@@ -116,7 +124,7 @@ public class PatientService {
         patient.setDateOfBirth(LocalDate.parse(patientRequestDto.getDateOfBirth()));
 
 
-       Patient UpdatedPatient = patientRepository.save(patient);
+        Patient UpdatedPatient = patientRepository.save(patient);
         return PatientMapper.toDto(UpdatedPatient);
     }
 

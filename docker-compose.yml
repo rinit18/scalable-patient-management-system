@@ -39,21 +39,21 @@ services:
   # Databases
   # -------------------------
 
-  auth-db:
+  auth-service-db:
     image: postgres:15
     container_name: auth-db
     environment:
-      POSTGRES_DB: authdb
+      POSTGRES_DB: db
       POSTGRES_USER: admin_user
       POSTGRES_PASSWORD: password
     ports:
       - "5001:5432"
 
-  patient-db:
+  patient-service-db:
     image: postgres:15
     container_name: patient-db
     environment:
-      POSTGRES_DB: patientdb
+      POSTGRES_DB: db
       POSTGRES_USER: admin_user
       POSTGRES_PASSWORD: password
     ports:
@@ -66,12 +66,12 @@ services:
   auth-service:
     build: ./auth-service
     depends_on:
-      - auth-db
+      - auth-service-db
     ports:
       - "4005:4005"
     environment:
       JWT_SECRET: "ee55c4b2f400cb8415f8efa582e356bd9e2cce4cbd0baf7033a71c7dd82920b6"
-      SPRING_DATASOURCE_URL: "jdbc:postgresql://auth-db:5432/authdb"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://auth-db:5432/db"
       SPRING_DATASOURCE_USERNAME: "admin_user"
       SPRING_DATASOURCE_PASSWORD: "password"
       SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
@@ -80,31 +80,40 @@ services:
   billing-service:
     build: ./billing-service
     ports:
+      - "4001:4001"
       - "9001:9001"
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      - kafka
 
   patient-service:
     build: ./patient-service
     depends_on:
       - kafka
       - billing-service
-      - patient-db
+      - patient-service-db
       - redis
     ports:
       - "4000:4000"
     environment:
-      SPRING_DATASOURCE_URL: "jdbc:postgresql://patient-db:5432/patientdb"
+
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://patient-service-db:5432/db"
       SPRING_DATASOURCE_USERNAME: "admin_user"
       SPRING_DATASOURCE_PASSWORD: "password"
       SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
       SPRING_SQL_INIT_MODE: "always"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       BILLING_SERVICE_ADDRESS: "billing-service"
+      BILLING_SERVICE_GRPC_PORT: '9001'
       SPRING_CACHE_TYPE: redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: '6379'
 
   analytics-service:
     build: ./analytics-service
+    ports:
+      - 4002:4002
     depends_on:
       - kafka
     environment:
@@ -114,7 +123,6 @@ services:
     build: ./api-gateway
     depends_on:
       - auth-service
-      - patient-service
     ports:
       - "4004:4004"
     environment:

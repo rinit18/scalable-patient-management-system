@@ -9,6 +9,8 @@ import com.rinit.patientservice.service.PatientService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.groups.Default;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -32,14 +34,14 @@ public class PatientController {
     @GetMapping
     @Operation(summary = "Get Patients")
     public ResponseEntity<PagedPatientResponseDto> getPatient(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "1") @Min(1) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @RequestParam(defaultValue = "asc") String sort,
             @RequestParam(defaultValue = "name") String sortField,
             @RequestParam(defaultValue = "") String searchValue
     ) {
 
-        PagedPatientResponseDto patients = patientService.getpatients(page, size, sort, sortField , searchValue );
+        PagedPatientResponseDto patients = patientService.getPatients(page, size, sort, sortField , searchValue );
         return ResponseEntity.ok().body(patients);
 
     }
