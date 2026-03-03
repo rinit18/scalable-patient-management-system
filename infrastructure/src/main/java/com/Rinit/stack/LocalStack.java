@@ -220,7 +220,7 @@ public class LocalStack extends Stack {
                         .image(ContainerImage.fromRegistry("api-gateway"))
                         .environment(Map.of(
                                 "SPRING_PROFILES_ACTIVE", "prod",
-                                "AUTH_SERVICE_URL", "http://host.docker.internal:4005"
+                                "AUTH_SERVICE_URL", "http://auth-service.patient-management.local:4005"
                         ))
                         .portMappings(List.of(4004).stream()
                                 .map(port -> PortMapping.builder()

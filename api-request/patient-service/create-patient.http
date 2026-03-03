@@ -1,11 +1,11 @@
 ### create request
-POST http://localhost:4004/api/patients
+POST http://lb-1a459ced.elb.localhost.localstack.cloud:4004/api/patients
 Content-Type: application/json
 Authorization: Bearer {{token}}
 
 {
   "name": "Arjun Mehta",
-  "email": "arjun.mehta.dev94@example.com",
+  "email": "arjun.mehta.dev79@example.com",
   "address": "Baner, Pune, Maharashtra",
   "dateOfBirth": "1992-11-03"
 
