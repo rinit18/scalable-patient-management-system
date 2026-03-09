@@ -30,7 +30,7 @@ public class PatientIntegrationTest {
     @Test
     public void shouldReturn429AfterLimitExceeded() { // Removed InterruptedException
         String token = getToken();
-        int total = 15;
+        int total = 50;
         int tooManyRequests = 0;
 
         // Fire requests as fast as possible to overwhelm the 10-request burst capacity
