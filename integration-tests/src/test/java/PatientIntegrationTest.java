@@ -27,12 +27,13 @@ public class PatientIntegrationTest {
                 .statusCode(200)
                 .body(notNullValue());
     }
-     @Test
-     public void shouldReturn429AfterLimitExceeded() throws InterruptedException {
+    @Test
+    public void shouldReturn429AfterLimitExceeded() { // Removed InterruptedException
         String token = getToken();
         int total = 15;
         int tooManyRequests = 0;
 
+        // Fire requests as fast as possible to overwhelm the 10-request burst capacity
         for (int i = 1;  i <= total; i++) {
             Response response = RestAssured
                     .given()
@@ -41,15 +42,13 @@ public class PatientIntegrationTest {
 
             System.out.printf("Request %d -> Status %d%n", i, response.statusCode());
 
-            if(response.statusCode()==429){
+            if(response.statusCode() == 429){
                 tooManyRequests++;
             }
-            Thread.sleep(100);
         }
 
-        assertTrue(tooManyRequests >= 1,"Expected at least 1 request to be rate limited (429)");
-     }
-
+        assertTrue(tooManyRequests >= 1, "Expected at least 1 request to be rate limited (429)");
+    }
 
     private static String getToken() {
         String loginPayload = """
