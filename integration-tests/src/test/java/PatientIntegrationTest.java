@@ -30,7 +30,7 @@ public class PatientIntegrationTest {
      @Test
      public void shouldReturn429AfterLimitExceeded() throws InterruptedException {
         String token = getToken();
-        int total = 3000;
+        int total = 15;
         int tooManyRequests = 0;
 
         for (int i = 1;  i <= total; i++) {

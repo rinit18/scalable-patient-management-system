@@ -11,8 +11,8 @@ spring:
       default-filters:
         - name: RequestRateLimiter
           args:
-            redis-rate-limiter.burstCapacity: 3000
-            redis-rate-limiter.replenishRate: 3000
+            redis-rate-limiter.burstCapacity: 10
+            redis-rate-limiter.replenishRate: 10
             key-resolver: "#{@ipKeyResolver}"
       routes:
         - id: auth-service-route
