@@ -1,215 +1,175 @@
 # Scalable Patient Management System
 
-A **production-style microservices backend** built with **Spring Boot**, **Apache Kafka**, and **gRPC**, demonstrating **distributed system design, event-driven architecture, and infrastructure automation**.
-
-The system simulates a scalable healthcare backend where independent services communicate using **synchronous RPC (gRPC)** and **asynchronous messaging (Kafka)** behind a **secured API Gateway**.
+A production-style microservices backend built with **Spring Boot**, **Apache Kafka**, and **gRPC**, demonstrating distributed system design, event-driven architecture, and infrastructure automation.
 
 ---
 
-# Architecture Overview
-
+## Architecture
 ```
 Client
    │
 API Gateway (JWT validation + Redis rate limiting)
    │
-   ├── Auth Service
-   │      Authentication & JWT issuance
-   │
-   ├── Patient Service
-   │      Core domain logic
-   │      ├─ Kafka producer
-   │      ├─ Redis cache
-   │      └─ Metrics instrumentation
-   │
-   ├── Billing Service
-   │      gRPC billing account provisioning
-   │
-   └── Analytics Service
-          Kafka consumer for event processing
+   ├── Auth Service          Authentication & JWT issuance
+   ├── Patient Service       Core domain logic (Kafka producer, Redis cache, metrics)
+   ├── Billing Service       gRPC billing account provisioning
+   └── Analytics Service     Kafka consumer for event processing
 ```
 
-Infrastructure stack:
+### Service Communication
 
-```
-AWS CDK • Docker Compose • Prometheus • Grafana
-```
+| Pattern     | Usage                               |
+|-------------|-------------------------------------|
+| REST / HTTP | Client → API Gateway                |
+| gRPC        | Patient Service → Billing Service   |
+| Kafka       | Patient Service → Analytics Service |
 
 ---
 
-# Service Communication Patterns
+## Tech Stack
 
-| Pattern      | Usage                               |
-| ------------ | ----------------------------------- |
-| REST / HTTP  | Client → API Gateway                |
-| gRPC         | Patient Service → Billing Service   |
-| Kafka Events | Patient Service → Analytics Service |
-
----
-
-# Key Engineering Highlights
-
-* **Microservices architecture** with independent PostgreSQL databases per service
-* **Event-driven system design** using Apache Kafka with Protobuf serialization
-* **Reliable Kafka producer configuration** (`acks=all`, retries enabled)
-* **Low-latency service communication** using gRPC
-* **Redis caching layer** for frequently accessed patient records
-* **API rate limiting** implemented at the gateway using Redis
-* **Circuit breaker & retry patterns** implemented with Resilience4j
-* **JWT authentication** enforced through a custom Spring Cloud Gateway filter
-* **Custom Micrometer metrics (AOP)** tracking Redis cache misses
-* **Centralized exception handling** with structured error responses
-* **Observability stack** using Prometheus, Grafana, and Spring Boot Actuator
-* **Containerized microservices** with optimized multi-stage Docker builds
-* **Infrastructure as Code** using AWS CDK
-* **CI/CD pipelines** implemented with GitHub Actions
-* **End-to-end integration testing** using RestAssured + JUnit
+| Category         | Technology                          |
+|------------------|-------------------------------------|
+| Language         | Java 17                             |
+| Framework        | Spring Boot 3                       |
+| Security         | Spring Security + JWT               |
+| Gateway          | Spring Cloud Gateway                |
+| Messaging        | Apache Kafka + Protocol Buffers     |
+| RPC              | gRPC                                |
+| Caching          | Redis                               |
+| Database         | PostgreSQL                          |
+| Resilience       | Resilience4j                        |
+| Metrics          | Micrometer + Prometheus + Grafana   |
+| Containerization | Docker + Docker Compose             |
+| Infrastructure   | AWS CDK                             |
+| CI/CD            | GitHub Actions                      |
+| Testing          | JUnit 5 + RestAssured + k6          |
 
 ---
 
-# Repository Structure
+## Key Engineering Decisions
 
-```
-api-gateway/         API gateway (JWT validation, Redis rate limiting)
-auth-service/        Authentication service
-patient-service/     Core domain service (REST, Kafka, Redis, metrics)
-billing-service/     gRPC billing microservice
-analytics-service/   Kafka consumer service
-
-integration-tests/   End-to-end API tests
-infrastructure/      AWS CDK infrastructure code
-monitoring/          Prometheus configuration
-api-request/         REST request collections
-grpc-request/        gRPC request examples
-```
+- **Separate PostgreSQL databases per service** — no shared state between microservices
+- **Kafka with Protobuf serialization** — type-safe, schema-enforced async messaging
+- **Reliable Kafka producer** (`acks=all`, retries) — ensures no event loss under failure
+- **Resilience4j circuit breakers** — graceful degradation when billing service is unavailable
+- **Redis rate limiting at gateway** — protects all downstream services from traffic spikes
+- **Custom Micrometer AOP aspect** — tracks Redis cache miss ratio as a named metric
+- **Multi-stage Docker builds** — optimized image sizes across all services
+- **AWS CDK (IaC)** — infrastructure provisioned as code, not manually
 
 ---
 
-# Technology Stack
+## Getting Started
 
-| Category         | Technology                      |
-| ---------------- | ------------------------------- |
-| Language         | Java 17                         |
-| Framework        | Spring Boot 3                   |
-| Security         | Spring Security + JWT           |
-| Gateway          | Spring Cloud Gateway            |
-| Messaging        | Apache Kafka + Protocol Buffers |
-| RPC              | gRPC                            |
-| Caching          | Redis                           |
-| Database         | PostgreSQL                      |
-| Resilience       | Resilience4j                    |
-| Metrics          | Micrometer                      |
-| Monitoring       | Prometheus + Grafana            |
-| Containerization | Docker + Docker Compose         |
-| Build Tool       | Maven                           |
-| Testing          | JUnit 5 + RestAssured           |
-| Infrastructure   | AWS CDK                         |
-| CI/CD            | GitHub Actions                  |
+### Prerequisites
+- Docker
+- Docker Compose
 
----
-
-# Running the System Locally
-
-## Prerequisites
-
-* Docker
-* Docker Compose
-* Java 17 (optional if running services locally)
-
-## Start all services
-
+### Run locally
 ```bash
+# Copy environment variables
+cp .env.example .env
+
+# Start all services
 docker-compose up --build
 ```
 
-This command starts:
+This starts all microservices, PostgreSQL databases, Kafka, and Redis.
 
-* all microservices
-* PostgreSQL databases
-* Kafka + Zookeeper
-* Redis
+### Service Ports
 
----
-
-# Service Ports
-
-| Service           | Port                      |
-| ----------------- | ------------------------- |
-| API Gateway       | 4004                      |
-| Auth Service      | 4005                      |
-| Patient Service   | 4000                      |
-| Billing Service   | 4001 (HTTP) / 9001 (gRPC) |
-| Analytics Service | 4002                      |
-| Redis             | 6379                      |
+| Service           | Port                       |
+|-------------------|----------------------------|
+| API Gateway       | 4004                       |
+| Auth Service      | 4005                       |
+| Patient Service   | 4000                       |
+| Billing Service   | 4001 (HTTP) / 9001 (gRPC)  |
+| Analytics Service | 4002                       |
+| Redis             | 6379                       |
 
 ---
 
-# API Documentation
+## API Documentation
 
-| Service         | URL                                         |
-| --------------- | ------------------------------------------- |
+| Service         | Swagger UI                                  |
+|-----------------|---------------------------------------------|
 | Patient Service | http://localhost:4000/swagger-ui/index.html |
 | Auth Service    | http://localhost:4005/swagger-ui/index.html |
 
 ---
 
-# Integration Testing
+## Testing
 
-Run full end-to-end tests:
-
+### Integration Tests
 ```bash
 mvn test
 ```
+Validates auth and patient workflows end-to-end through the API Gateway using RestAssured.
 
-Tests validate authentication and patient workflows through the **API Gateway**.
+### CI/CD Pipelines
 
----
+Three automated GitHub Actions workflows run on every push and pull request:
 
-# CI/CD Pipeline
-
-Three automated workflows run on `push` and `pull_request` events.
-
-| Workflow               | Purpose                                          |
-| ---------------------- | ------------------------------------------------ |
-| `maven.yml`            | Builds all services                              |
-| `docker-build.yml`     | Builds Docker images                             |
-| `integration-test.yml` | Runs full integration tests using Docker Compose |
+| Workflow               | Purpose                                       |
+|------------------------|-----------------------------------------------|
+| `maven.yml`            | Builds all services                           |
+| `docker-build.yml`     | Builds Docker images                          |
+| `integration-test.yml` | Runs full integration tests via Docker Compose|
 
 ---
 
-# Observability
+## Load Testing (k6)
 
-Metrics are exposed through **Spring Boot Actuator + Micrometer**.
+Tested using k6 with an extreme load scenario — 600 concurrent VUs over 8 minutes.
 
-Prometheus scrapes metrics every **5 seconds**.
+| Scenario      | VUs | RPS  | Error Rate | p95 Latency |
+|---------------|-----|------|------------|-------------|
+| Moderate load | 100 | ~95  | 0%         | <2s ✅      |
+| Extreme load  | 600 | ~77  | 0%         | 15s*        |
+
+*Extreme load saturated local machine RAM and PostgreSQL write I/O across 18,000+ iterations (19GB writes). Zero errors maintained even under full resource exhaustion. Latency under extreme load is a local hardware constraint, not a code issue.
+
+---
+
+## Observability
+
+Metrics exposed via **Spring Boot Actuator + Micrometer**, scraped by Prometheus every 5 seconds.
 
 Grafana dashboards visualize:
-
-* API latency
-* request throughput
-* cache hit / miss ratio
-* service health metrics
-
-Example custom metric:
-
-```
-custom.redis.cache.miss
-```
-
-Tracked via a **Micrometer AOP aspect**.
+- API latency and request throughput
+- Cache hit / miss ratio (`custom.redis.cache.miss`)
+- Service health metrics
 
 ---
 
-# Future Improvements
+## Repository Structure
+```
+api-gateway/         JWT validation, Redis rate limiting
+auth-service/        Authentication and JWT issuance
+patient-service/     Core domain (REST, Kafka, Redis, metrics)
+billing-service/     gRPC billing microservice
+analytics-service/   Kafka consumer
 
-* Kubernetes deployment manifests
-* Distributed tracing with OpenTelemetry
-* Service discovery integration
-* Load testing and performance benchmarking
+integration-tests/   End-to-end RestAssured tests
+performance-test/    k6 load test scripts
+infrastructure/      AWS CDK infrastructure code
+monitoring/          Prometheus configuration
+```
 
 ---
 
-# Author
+## Future Improvements
 
-**Rinit Bhowmick**
-Backend developer focused on **distributed systems, microservices architecture, and scalable backend infrastructure**.
+- Kubernetes deployment manifests (Helm charts)
+- Distributed tracing with OpenTelemetry
+- Service discovery with Consul or Eureka
+
+---
+
+## Author
+
+**Rinit Bhowmick** — Backend developer focused on distributed systems and scalable microservices.
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-rinit--bhowmick-blue)](https://linkedin.com/in/rinit-bhowmick)
+[![GitHub](https://img.shields.io/badge/GitHub-rinit18-black)](https://github.com/rinit18)

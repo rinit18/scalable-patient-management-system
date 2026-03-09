@@ -1,39 +1,38 @@
-version: "3.9"
-
 services:
 
   # -------------------------
   # Infrastructure
   # -------------------------
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
-    depends_on:
-      - zookeeper
+    image: confluentinc/cp-kafka:7.7.0
+    restart: unless-stopped
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
-
-      # Single internal listener
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-
-
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_KRAFT_MODE: "true"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions", "--bootstrap-server", "localhost:9092"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
 
   redis:
-    image: redis:latest
+    image: redis:7.2
+    restart: unless-stopped
     ports:
-      - 6379:6379
+      - "6379:6379"
 
   # -------------------------
   # Databases
@@ -42,22 +41,34 @@ services:
   auth-service-db:
     image: postgres:15
     container_name: auth-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: db
-      POSTGRES_USER: admin_user
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5001:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   patient-service-db:
     image: postgres:15
     container_name: patient-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: db
-      POSTGRES_USER: admin_user
-      POSTGRES_PASSWORD: password
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5000:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # -------------------------
   # Microservices
@@ -65,65 +76,89 @@ services:
 
   auth-service:
     build: ./auth-service
+    restart: unless-stopped
     depends_on:
-      - auth-service-db
+      auth-service-db:
+        condition: service_healthy
     ports:
       - "4005:4005"
     environment:
-      JWT_SECRET: "ee55c4b2f400cb8415f8efa582e356bd9e2cce4cbd0baf7033a71c7dd82920b6"
+      JWT_SECRET: ${JWT_SECRET}
       SPRING_DATASOURCE_URL: "jdbc:postgresql://auth-db:5432/db"
-      SPRING_DATASOURCE_USERNAME: "admin_user"
-      SPRING_DATASOURCE_PASSWORD: "password"
-      SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
       SPRING_SQL_INIT_MODE: "always"
 
   billing-service:
     build: ./billing-service
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
     ports:
       - "4001:4001"
       - "9001:9001"
     environment:
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-    depends_on:
-      - kafka
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
 
   patient-service:
     build: ./patient-service
+    restart: unless-stopped
     depends_on:
-      - kafka
-      - billing-service
-      - patient-service-db
-      - redis
+      kafka:
+        condition: service_healthy
+      patient-service-db:
+        condition: service_healthy
+      billing-service:
+        condition: service_started
+      redis:
+        condition: service_started
     ports:
       - "4000:4000"
     environment:
-
       SPRING_DATASOURCE_URL: "jdbc:postgresql://patient-service-db:5432/db"
-      SPRING_DATASOURCE_USERNAME: "admin_user"
-      SPRING_DATASOURCE_PASSWORD: "password"
-      SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
       SPRING_SQL_INIT_MODE: "always"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       BILLING_SERVICE_ADDRESS: "billing-service"
-      BILLING_SERVICE_GRPC_PORT: '9001'
+      BILLING_SERVICE_GRPC_PORT: "9001"
       SPRING_CACHE_TYPE: redis
       SPRING_DATA_REDIS_HOST: redis
-      SPRING_DATA_REDIS_PORT: '6379'
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "40"
+      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "10"
+      SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: "30000"
+      SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT: "600000"
+      SPRING_DATASOURCE_HIKARI_MAX_LIFETIME: "1800000"
 
   analytics-service:
     build: ./analytics-service
-    ports:
-      - 4002:4002
+    restart: unless-stopped
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
+    ports:
+      - "4002:4002"
     environment:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
 
   api-gateway:
     build: ./api-gateway
+    restart: unless-stopped
     depends_on:
-      - auth-service
+      auth-service:
+        condition: service_started
     ports:
       - "4004:4004"
     environment:
       AUTH_SERVICE_URL: "http://auth-service:4005"
+
+# -------------------------
+# Volumes
+# -------------------------
+
+volumes:
+  kafka-data:
