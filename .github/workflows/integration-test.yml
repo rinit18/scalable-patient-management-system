@@ -7,6 +7,14 @@ on:
 jobs:
   integration-test:
     runs-on: ubuntu-latest
+    
+    # ---------------------------------------------------------
+    # SECRETS ADDED HERE: Available to all steps in this job
+    # ---------------------------------------------------------
+    env:
+      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
     steps:
       - uses: actions/checkout@v4
