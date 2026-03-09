@@ -35,3 +35,4 @@ Thumbs.db
 # AWS CDK build output
 cdk.out/
 infrastructure/cdk.out/
+

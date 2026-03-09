@@ -1,5 +1,6 @@
-services:
+version: '3.8'
 
+services:
   # -------------------------
   # Infrastructure
   # -------------------------
@@ -33,6 +34,8 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    volumes:
+      - redis-data:/data
 
   # -------------------------
   # Databases
@@ -48,6 +51,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5001:5432"
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d db"]
       interval: 10s
@@ -64,6 +69,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5000:5432"
+    volumes:
+      - patient-db-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d db"]
       interval: 10s
@@ -87,7 +94,7 @@ services:
       SPRING_DATASOURCE_URL: "jdbc:postgresql://auth-db:5432/db"
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
-      SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
       SPRING_SQL_INIT_MODE: "always"
 
   billing-service:
@@ -117,22 +124,16 @@ services:
     ports:
       - "4000:4000"
     environment:
-      SPRING_DATASOURCE_URL: "jdbc:postgresql://patient-service-db:5432/db"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://patient-db:5432/db"
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
-      SPRING_SQL_INIT_MODE: "always"
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
       BILLING_SERVICE_ADDRESS: "billing-service"
       BILLING_SERVICE_GRPC_PORT: "9001"
       SPRING_CACHE_TYPE: redis
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
-      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: "40"
-      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: "10"
-      SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: "30000"
-      SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT: "600000"
-      SPRING_DATASOURCE_HIKARI_MAX_LIFETIME: "1800000"
 
   analytics-service:
     build: ./analytics-service
@@ -156,9 +157,39 @@ services:
     environment:
       AUTH_SERVICE_URL: "http://auth-service:4005"
 
+  # -------------------------
+  # Monitoring
+  # -------------------------
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment: # Add these environment variables
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - grafana-data:/var/lib/grafana
+
 # -------------------------
 # Volumes
 # -------------------------
 
 volumes:
   kafka-data:
+  redis-data:
+  auth-db-data:
+  patient-db-data:
+  prometheus-data:
+  grafana-data:
