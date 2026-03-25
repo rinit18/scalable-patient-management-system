@@ -43,7 +43,6 @@ services:
 
   auth-service-db:
     image: postgres:15
-    container_name: auth-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: db
@@ -61,7 +60,6 @@ services:
 
   patient-service-db:
     image: postgres:15
-    container_name: patient-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: db
@@ -91,7 +89,7 @@ services:
       - "4005:4005"
     environment:
       JWT_SECRET: ${JWT_SECRET}
-      SPRING_DATASOURCE_URL: "jdbc:postgresql://auth-db:5432/db"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://auth-service-db:5432/db"
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
@@ -124,7 +122,7 @@ services:
     ports:
       - "4000:4000"
     environment:
-      SPRING_DATASOURCE_URL: "jdbc:postgresql://patient-db:5432/db"
+      SPRING_DATASOURCE_URL: "jdbc:postgresql://patient-service-db:5432/db"
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: "validate"
@@ -162,12 +160,11 @@ services:
   # -------------------------
 
   prometheus:
-    image: prom/prometheus:latest
+    build: ./monitoring
     restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
 
   grafana:
@@ -175,7 +172,7 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    environment: # Add these environment variables
+    environment:
       - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
