@@ -3,21 +3,15 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
-            steps {
-                git branch: 'main', url: 'https://github.com/rinit18/scalable-patient-management-system'
-            }
-        }
-
         stage('Build') {
             steps {
-                sh 'mvn clean install -DskipTests'
+                sh './mvnw clean install -DskipTests'
             }
         }
 
         stage('Test') {
             steps {
-                sh 'mvn test'
+                sh './mvnw test'
             }
         }
 
