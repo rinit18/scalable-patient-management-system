@@ -15,7 +15,7 @@ pipeline {
             }
         }
 
-        stage('Build Services') {
+        stage('Build Services (Skip Tests)') {
             steps {
                 sh '''
                 cd auth-service && ./mvnw clean install -DskipTests
@@ -27,31 +27,34 @@ pipeline {
             }
         }
 
-        stage('Run Tests') {
-            steps {
-                sh '''
-                cd auth-service && ./mvnw test
-                cd ../patient-service && ./mvnw test
-                cd ../billing-service && ./mvnw test
-                cd ../analytics-service && ./mvnw test
-                cd ../api-gateway && ./mvnw test
-                '''
-            }
-        }
-
         stage('Docker Build') {
             steps {
                 sh 'docker-compose build'
             }
         }
 
-        stage('Run Full System') {
+        stage('Start System') {
             steps {
                 sh '''
                 docker-compose down
                 docker-compose up -d
-                sleep 30
+                sleep 40
                 '''
+            }
+        }
+
+        stage('Run Integration Tests') {
+            steps {
+                sh '''
+                cd integration-tests
+                mvn test
+                '''
+            }
+        }
+
+        stage('Stop System') {
+            steps {
+                sh 'docker-compose down'
             }
         }
     }
