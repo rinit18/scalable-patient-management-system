@@ -29,7 +29,13 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                sh 'docker-compose build'
+                sh '''
+                # Create the .env file from the example so Docker Compose has the variables
+                cp .env.example .env
+                
+                # Build the images
+                docker-compose build
+                '''
             }
         }
 
