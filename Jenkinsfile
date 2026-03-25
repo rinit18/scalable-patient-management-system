@@ -5,7 +5,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                git 'https://github.com/rinit18/scalable-patient-management-system'
+                git branch: 'main', url: 'https://github.com/rinit18/scalable-patient-management-system'
             }
         }
 
