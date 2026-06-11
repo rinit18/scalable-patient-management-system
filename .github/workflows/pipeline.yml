@@ -26,9 +26,9 @@ jobs:
     needs: maven-build  # <--- Waits for maven-build matrix to finish successfully
     runs-on: ubuntu-latest
     env:
-      POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
-      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      POSTGRES_USER: ${{ secrets.INT_POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.INT_POSTGRES_PASSWORD }}
+      JWT_SECRET: ${{ secrets.INT_JWT_SECRET }}
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
