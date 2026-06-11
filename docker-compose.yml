@@ -76,11 +76,11 @@ services:
       retries: 5
 
   # -------------------------
-  # Microservices
+  # Microservices (Now pulling from ECR)
   # -------------------------
 
   auth-service:
-    build: ./auth-service
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
     restart: unless-stopped
     depends_on:
       auth-service-db:
@@ -96,7 +96,7 @@ services:
       SPRING_SQL_INIT_MODE: "always"
 
   billing-service:
-    build: ./billing-service
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/billing-service:latest
     restart: unless-stopped
     depends_on:
       kafka:
@@ -108,7 +108,7 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
 
   patient-service:
-    build: ./patient-service
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/patient-service:latest
     restart: unless-stopped
     depends_on:
       kafka:
@@ -134,7 +134,7 @@ services:
       SPRING_DATA_REDIS_PORT: "6379"
 
   analytics-service:
-    build: ./analytics-service
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/analytics-service:latest
     restart: unless-stopped
     depends_on:
       kafka:
@@ -145,7 +145,7 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
 
   api-gateway:
-    build: ./api-gateway
+    image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/api-gateway:latest
     restart: unless-stopped
     depends_on:
       auth-service:
@@ -166,6 +166,16 @@ services:
       - "9090:9090"
     volumes:
       - prometheus-data:/prometheus
+
+  node-exporter:
+    image: prom/node-exporter:v1.8.1
+    restart: unless-stopped
+    volumes:
+      - /:/host:ro,rslave
+    command:
+      - '--path.rootfs=/host'
+    ports:
+      - "9100:9100"
 
   grafana:
     image: grafana/grafana:latest

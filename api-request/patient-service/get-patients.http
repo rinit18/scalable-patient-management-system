@@ -1,5 +1,2 @@
-### GET request to get all patients
-GET http://localhost:4004/api/patients?sort+=asc&size=5&page=1
+GET http://54.147.182.132:4004/api/patients?sort=asc&size=5&page=1
 Authorization: Bearer {{token}}
-
-###

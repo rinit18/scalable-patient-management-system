@@ -1,4 +1,4 @@
 ###
 
-GET http://localhost:4004/auth/validate
+GET http://54.147.182.132:4004/auth/validate
 Authorization: Bearer {{token}}
