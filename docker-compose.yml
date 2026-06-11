@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # -------------------------
   # Infrastructure
@@ -81,6 +79,7 @@ services:
 
   auth-service:
     image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/auth-service:latest
+    build: ./auth-service
     restart: unless-stopped
     depends_on:
       auth-service-db:
@@ -97,6 +96,7 @@ services:
 
   billing-service:
     image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/billing-service:latest
+    build: ./billing-service
     restart: unless-stopped
     depends_on:
       kafka:
@@ -109,6 +109,7 @@ services:
 
   patient-service:
     image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/patient-service:latest
+    build: ./patient-service
     restart: unless-stopped
     depends_on:
       kafka:
@@ -135,6 +136,7 @@ services:
 
   analytics-service:
     image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/analytics-service:latest
+    build: ./analytics-service
     restart: unless-stopped
     depends_on:
       kafka:
@@ -146,6 +148,7 @@ services:
 
   api-gateway:
     image: ${AWS_ACCOUNT_ID}.dkr.ecr.us-east-1.amazonaws.com/api-gateway:latest
+    build: ./api-gateway
     restart: unless-stopped
     depends_on:
       auth-service:
