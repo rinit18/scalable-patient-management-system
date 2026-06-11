@@ -8,12 +8,12 @@ CREATE TABLE IF NOT EXISTS "users" (
 
 -- Insert the user if no existing user with the same id or email exists
 INSERT INTO "users" (id, email, password, role)
-SELECT '223e4567-e89b-12d3-a456-426614174006', 'testuser@test.com',
+SELECT CAST('223e4567-e89b-12d3-a456-426614174006' AS UUID), 'testuser@test.com',
        '$2a$10$u2dnJswU6Tndjrayxl6.AeyrGvFQYWbrfwm2cM.YuL8/E9HpSHlA.', 'ADMIN'
     WHERE NOT EXISTS (
     SELECT 1
     FROM "users"
-    WHERE id = '223e4567-e89b-12d3-a456-426614174006'
+    WHERE id = CAST('223e4567-e89b-12d3-a456-426614174006' AS UUID)
        OR email = 'testuser@test.com'
 );
 

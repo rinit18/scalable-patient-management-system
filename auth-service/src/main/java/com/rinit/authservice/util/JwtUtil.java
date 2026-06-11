@@ -20,7 +20,18 @@ public class JwtUtil {
 
  public JwtUtil(@Value("${jwt.secret}") String secret){
 
-     byte[] keyBytes = Base64.getDecoder().decode(secret.getBytes(StandardCharsets.UTF_8));
+     byte[] keyBytes;
+     try {
+         keyBytes = Base64.getDecoder().decode(secret.getBytes(StandardCharsets.UTF_8));
+     } catch (IllegalArgumentException e) {
+         keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+     }
+
+     if (keyBytes.length < 32) {
+         byte[] padded = new byte[32];
+         System.arraycopy(keyBytes, 0, padded, 0, keyBytes.length);
+         keyBytes = padded;
+     }
 
      this.secretKey = Keys.hmacShaKeyFor(keyBytes);
  }
