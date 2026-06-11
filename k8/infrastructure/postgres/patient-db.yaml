@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: patient-db-pvc
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: patient-db
+  namespace: default
+spec:
+  serviceName: "patient-db-service"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: patient-db
+  template:
+    metadata:
+      labels:
+        app: patient-db
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: "db"
+        - name: POSTGRES_USER
+          valueFrom:
+            configMapKeyRef:
+              name: patient-management-config
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: patient-management-secrets
+              key: POSTGRES_PASSWORD
+        volumeMounts:
+        - name: patient-db-data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: patient-db-data
+        persistentVolumeClaim:
+          claimName: patient-db-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-db-service
+  namespace: default
+spec:
+  selector:
+    app: patient-db
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432

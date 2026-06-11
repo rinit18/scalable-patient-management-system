@@ -57,26 +57,68 @@ If you want to validate the token directly, run `api-request/auth-service/valida
 docker compose down
 ```
 
-## 🗺️ System Architecture
+## Architecture
 
-![Patient Management Pro — System Architecture](docs/architecture.png)
+```mermaid
+flowchart TD
+    classDef microservice fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000;
+    classDef database fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000;
+    classDef messaging fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000;
+    classDef cache fill:#fce4ec,stroke:#c2185b,stroke-width:2px,color:#000;
+    classDef observability fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000;
+    classDef client fill:#eceff1,stroke:#455a64,stroke-width:2px,color:#000;
 
-> **Diagram guide:** Solid thick arrows are primary data paths. Thin arrows are supporting/validation flows. Dashed arrows are data reads/writes and metric scrapes. The red dashed box on the gRPC path represents the active Circuit Breaker.
+    Client(("📱 Client")):::client
 
-### Communication Matrix
+    subgraph Edge ["🌐 Edge Layer"]
+        Gateway["🚦 API Gateway"]:::microservice
+    end
 
-| # | From | To | Protocol | Pattern | Notes |
-|---|---|---|---|---|---|
-| 1 | Client | API Gateway | HTTPS REST | Synchronous | Rate limited: 10 req/s via Redis |
-| 2 | API Gateway | Auth Service | HTTP | Synchronous | JWT token validation on `/auth/**` |
-| 3 | API Gateway | Patient Service | HTTPS REST | Synchronous | JwtValidation filter on `/api/patients/**` |
-| 4 | Patient Service | Billing Service | **gRPC** (HTTP/2 + Protobuf) | Synchronous | **Circuit Breaker** (50% failure threshold, 10s open) + **Retry** (2 attempts, 500ms wait) |
-| 4a | Patient Service | Kafka `billing-account` | Kafka Produce | Async (Fallback) | Circuit Breaker fallback: publishes `BillingAccountEvent` when gRPC fails |
-| 5 | Patient Service | Kafka `patient` | Kafka Produce | Asynchronous | `PatientCreatedEvent` published on every patient creation |
-| 6 | Apache Kafka | Analytics Service | Kafka Consume | Asynchronous | Consumer group: `analytics-service`, offset: earliest |
-| 7 | Patient Service | Prometheus | HTTP Actuator | Pull-based | Micrometer + custom `custom.redis.cache.miss` counter via AOP |
+    subgraph Core ["⚙️ Core Services"]
+        Auth["🔒 Auth Service"]:::microservice
+        Patient["🏥 Patient Service"]:::microservice
+        Billing["💳 Billing Service"]:::microservice
+        Analytics["📊 Analytics Service"]:::microservice
+    end
 
-## 🔬 Technology Choices: Why & How
+    subgraph Data ["💾 Data Layer"]
+        ADB[("Auth DB")]:::database
+        PDB[("Patient DB")]:::database
+        Redis[("Redis")]:::cache
+        Kafka[/"Apache Kafka"/]:::messaging
+    end
+
+    subgraph Obs ["📈 Observability"]
+        Prom["Prometheus"]:::observability
+        Grafana["Grafana"]:::observability
+    end
+
+    Client ==>|HTTPS REST| Gateway
+    Gateway -->|Validates JWT| Auth
+    Gateway ==>|Routes Request| Patient
+
+    Auth -.->|Read/Write| ADB
+    Patient -.->|Read/Write| PDB
+    Gateway -.->|Rate Limit Check| Redis
+    Patient -.->|Cache| Redis
+
+    Patient ==>|gRPC Sync| Billing
+    Patient -->|Publishes Event| Kafka
+    Kafka -->|Consumes Event| Analytics
+
+    Patient -.->|Actuator Metrics| Prom
+    Prom -.->|Visualise| Grafana
+```
+
+### Communication patterns
+
+| Pattern | Where used |
+|---|---|
+| REST/HTTP | Client -> API Gateway -> Auth/Patient services |
+| gRPC | Patient Service -> Billing Service |
+| Kafka | Patient Service -> Analytics Service |
+
+## Technology Choices: Why & How
 
 ### Spring Boot 3.x & Java
 * **Why:** Industry standard for enterprise microservices. It offers a massive ecosystem, fast development via auto-configuration, and robust community and corporate support.
@@ -103,17 +145,10 @@ docker compose down
 * **How:** `auth-service` and `patient-service` each have isolated, separate PostgreSQL containers orchestrated via Docker (`auth-service-db`, `patient-service-db`). They interact via Spring Data JPA.
 
 ### Redis
-* **Why:** Excellent for ultra-fast in-memory data storage to avoid repeated heavy DB queries, and perfectly suited for atomic distributed rate-limit counters.
-* **How:** Used for two distinct purposes:
-  1. **Rate Limiting:** `api-gateway` uses Spring Cloud Gateway's `RequestRateLimiter` filter backed by Redis — configured at 10 `replenishRate` / 10 `burstCapacity` requests per second per IP (`ipKeyResolver`).
-  2. **Caching:** `patient-service` has a custom `RedisCacheConfig` (`@EnableCaching`) with a 10-minute TTL and Jackson JSON serialization for cache entries.
-
-### Resilience4j (Circuit Breaker + Retry)
-* **Why:** In a distributed system, gRPC calls to `billing-service` can fail due to network issues or service restarts. Without a circuit breaker, a degraded downstream service can cascade failures up the call chain, taking down the entire patient creation flow.
-* **How:** The `BillingServiceGrpcClient.createBillingAccount()` method is decorated with:
-  - `@CircuitBreaker(name="billingService", fallbackMethod="billingFallback")` — Opens the circuit at 50% failure rate over a sliding window of 10 calls. Stays open for 10 seconds, then moves to half-open (allows 3 test calls).
-  - `@Retry(name="billingRetry")` — Retries up to 2 times with a 500ms wait before triggering the circuit breaker.
-  - **Fallback:** `billingFallback()` publishes a `BillingAccountEvent` to the Kafka `billing-account` topic, ensuring billing provisioning is never lost — it's just deferred asynchronously.
+* **Why:** Excellent for ultra-fast, in-memory data storage to avoid repeating heavy DB queries, and perfectly suited for atomic distributed operations like counting.
+* **How:** Used dynamically for two purposes: 
+  1. **Rate Limiting:** `api-gateway` uses Redis to track API request limits per client IP.
+  2. **Caching:** `patient-service` uses Spring's `@Cacheable` to cache retrieval endpoints, drastically dropping latency for frequent queries.
 
 ### Prometheus & Grafana (Observability)
 * **Why:** You cannot optimize or debug what you cannot see. In distributed systems, pinpointing failures or performance bottlenecks requires centralized metric collection.
@@ -125,39 +160,36 @@ docker compose down
 
 ## Tech Stack
 
-| Category | Technology | Detail |
-|---|---|---|
-| Language | Java 17 | All 5 microservices (Java 21 for `infrastructure` module) |
-| Framework | Spring Boot 3.x | Each service has its own embedded server |
-| Gateway | Spring Cloud Gateway (Reactive) | Routes, JwtValidation filter, Redis rate limiter |
-| Security | Spring Security + JWT (`jjwt`) | Stateless token validation |
-| Messaging | Apache Kafka (KRaft mode) + Protobuf | Topics: `patient`, `billing-account` |
-| RPC | gRPC (`grpc-spring-boot-starter`) | Patient → Billing over HTTP/2 + Protobuf |
-| Datastore | PostgreSQL 15 | Per-service isolated DB instances |
-| Schema Migrations | Flyway (`flyway-core` + `flyway-database-postgresql`) | Patient service DB migrations |
-| Cache | Redis 7.2 | TTL 10min, Jackson JSON serializer |
-| Connection Pool | HikariCP | max=40, min-idle=10, timeout=30s |
-| Resilience | Resilience4j (Circuit Breaker + Retry) | On gRPC billing call; fallback to Kafka |
-| Observability | Actuator + Micrometer + Prometheus + Grafana | Custom AOP counter: `custom.redis.cache.miss` |
-| Testing | JUnit 5, RestAssured, k6 | Integration + load tests |
-| Containers | Docker, Docker Compose (v3.8) | One-command full-stack startup |
-| IaC | AWS CDK | In `infrastructure/`; deploys via LocalStack |
-| CI/CD | GitHub Actions + Jenkins | Matrix builds, Docker image builds, integration tests |
+| Category | Technology |
+|---|---|
+| Language | Java 17 (services), Java 21 (infrastructure module) |
+| Framework | Spring Boot 3.x |
+| Gateway | Spring Cloud Gateway |
+| Security | Spring Security + JWT (`jjwt`) |
+| Messaging | Apache Kafka + Protocol Buffers |
+| RPC | gRPC (`grpc-spring-boot-starter`) |
+| Datastore | PostgreSQL |
+| Cache / Rate limit support | Redis |
+| Resilience | Resilience4j |
+| Observability | Actuator + Micrometer + Prometheus + Grafana |
+| Testing | JUnit 5, RestAssured, k6 |
+| Containers | Docker, Docker Compose |
+| IaC | AWS CDK (in `infrastructure/`) |
+| CI/CD | GitHub Actions + Jenkins pipeline |
 
 ## 📈 Engineering Impact
 
 | Area | What Was Built | Why It Matters |
 |---|---|---|
-| 🏗️ **Architecture** | 5 decoupled microservices behind an API Gateway with independent PostgreSQL DBs and strict bounded contexts | Demonstrates production-grade system design with independent deployability and zero shared state |
-| 🔒 **Security** | Stateless JWT auth via `auth-service`; custom `JwtValidation` filter on the API Gateway for all patient routes | Eliminates session-state bottlenecks; scales horizontally without sticky sessions |
-| ⚡ **Inter-Service Comms** | gRPC + Protobuf for synchronous calls; Apache Kafka (2 topics) for async event-driven messaging | Mixed model proves real-world trade-off analysis — speed vs. decoupling |
-| 🛡️ **Resilience** | Resilience4j `@CircuitBreaker` (50% threshold, 10s open) + `@Retry` (2 attempts) on the gRPC path; graceful Kafka fallback | Proves understanding of production failure modes — the system degrades gracefully rather than crashing |
-| 🚀 **Performance** | Redis cache (TTL 10min) on patient reads + Redis-backed `RequestRateLimiter` (10 req/s) + HikariCP pool (max 40) | Multilayer performance strategy: edge protection, in-memory caching, and DB connection efficiency |
-| 🔭 **Observability** | Micrometer → Prometheus scrape pipeline + custom AOP `cache.miss` counter + Grafana dashboards | Full production visibility without a third-party APM |
-| 🧪 **Quality** | RestAssured integration tests + k6 load tests targeting 600 VUs | Validates distributed behavior end-to-end and stress-tests the system's breaking points |
-| 🤖 **CI/CD** | GitHub Actions matrix build + Jenkins declarative pipeline + Docker Compose E2E orchestration | Automated from commit → tested deployment; mirrors real engineering team workflows |
+| 🏗️ **Architecture** | 5-service distributed backend with an API Gateway, per-service PostgreSQL DBs, and strict bounded contexts | Demonstrates production-grade system design with independent deployability and zero shared state |
+| 🔒 **Security** | Stateless JWT auth via `auth-service`; all downstream routes protected through the API Gateway | Eliminates session-state bottlenecks in distributed systems; scales horizontally without sticky sessions |
+| ⚡ **Inter-Service Comms** | gRPC + Protobuf for synchronous calls; Apache Kafka for async event-driven messaging | Mixed communication model shows real-world trade-off analysis — speed vs. decoupling |
+| 🚀 **Performance** | Redis caching on hot endpoints + Redis-backed rate limiting at the gateway | Protects downstream services under traffic spikes; drastically reduces DB query load |
+| 🔭 **Observability** | Micrometer → Prometheus scrape pipeline + Grafana dashboards for JVM and HTTP metrics | Full production visibility into latency, errors, and throughput without a third-party APM |
+| 🧪 **Quality** | RestAssured integration tests + k6 load tests targeting 600 VUs | Validates distributed behavior end-to-end and measures system breaking points under stress |
+| 🤖 **CI/CD** | GitHub Actions matrix build + Jenkins declarative pipeline + Docker Compose orchestration | Automated from commit to tested deployment; mirrors real team engineering workflows |
 
-## 🚀 Local Setup
+## Local Setup
 
 ### Prerequisites
 
@@ -208,7 +240,7 @@ docker compose down
 | Prometheus | `9090` |
 | Grafana | `3000` |
 
-## 📄 API Docs & Request Collections
+## API Docs and Request Collections
 
 ### Swagger
 
@@ -221,11 +253,9 @@ docker compose down
 - Patient: `api-request/patient-service/create-patient.http`, `api-request/patient-service/get-patients.http`, `api-request/patient-service/update-patient.http`, `api-request/patient-service/delete-patient.http`
 - gRPC sample: `grpc-request/billing-service/create-billing-account.http`
 
-## 🧪 Testing
+## Testing
 
 ### Build services (skip tests)
-
-> **Note:** Use `./mvnw` on Linux/macOS or `mvnw.cmd` on Windows.
 
 ```bash
 cd auth-service && ./mvnw clean install -DskipTests
@@ -250,14 +280,14 @@ mvn test
 k6 run performance-test/patient-test.js
 ```
 
-## 📡 Observability
+## Observability
 
 - Prometheus config: `monitoring/prometheus.yml`
 - Scrape interval: 5 seconds
 - Current scrape target: `patient-service:4000/actuator/prometheus`
 - Grafana URL: `http://localhost:3000`
 
-## ⚙️ CI/CD
+## CI/CD
 
 ### GitHub Actions (`.github/workflows`)
 
@@ -276,75 +306,66 @@ Pipeline stages:
 5. Run `integration-tests`
 6. Stop the platform
 
-## 🔍 Service Deep Dive
+## Service Deep Dive
 
 ### `api-gateway`
-- Spring Cloud Gateway (reactive, Netty-based) entry point on port `4004`
-- **Redis Rate Limiter:** `RequestRateLimiter` filter applied globally — `replenishRate: 10`, `burstCapacity: 10`, keyed by client IP via `ipKeyResolver`
-- **JWT Validation filter** applied on the `/api/patients/**` route
-- Routes: `/auth/**` → Auth Service, `/api/patients/**` → Patient Service
-- Swagger aggregation routes: `/api-docs/patients`, `/api-docs/auth`
+
+- Spring Cloud Gateway entry point
+- Routes requests to backend services
+- Includes reactive Redis dependency for rate limiting support
 
 ### `auth-service`
-- Login and JWT token issuance on port `4005`
-- Spring Security + Spring Data JPA + PostgreSQL (`auth-service-db`)
-- Swagger/OpenAPI UI enabled at `/swagger-ui/index.html`
-- `SPRING_SQL_INIT_MODE=always` for initial seed data
 
-### `patient-service` _(most complex service)_
-- Core patient CRUD REST API on port `4000`
-- **Kafka Producer:** Publishes `PatientCreatedEvent` (Protobuf) to `patient` topic on each patient creation
-- **gRPC Client:** Calls `billing-service:9001` to provision billing accounts synchronously
-- **Circuit Breaker:** `@CircuitBreaker(name="billingService")` — 50% failure threshold, 10s wait in open state, 3 probe calls in half-open
-- **Retry:** `@Retry(name="billingRetry")` — 2 max attempts, 500ms between retries
-- **Circuit Breaker Fallback:** `billingFallback()` publishes `BillingAccountEvent` (Protobuf) to `billing-account` Kafka topic
-- **Redis Cache:** `RedisCacheConfig` with `@EnableCaching`, 10-minute TTL, Jackson JSON serializer
-- **HikariCP:** max pool size 40, min idle 10, 30s connection timeout
-- **Flyway:** Schema migrations via `flyway-core` + `flyway-database-postgresql`
-- **AOP Metrics:** `PatientServiceMetrics` aspect records custom `custom.redis.cache.miss` Micrometer counter on `getPatients()` calls
-- Actuator endpoints exposed: `health`, `info`, `prometheus`, `metrics`, `cache`
+- Authentication and JWT token operations
+- Spring Security + JPA + PostgreSQL
+- Swagger/OpenAPI enabled
+
+### `patient-service`
+
+- Core patient CRUD APIs
+- Publishes events to Kafka
+- Calls `billing-service` via gRPC
+- Uses Redis caching and Micrometer metrics
+- Includes Flyway and Resilience4j
 
 ### `billing-service`
-- gRPC server on port `9001`, HTTP on `4001`
-- Receives `BillingRequest` and returns `BillingResponse` (Protobuf, status `PENDING` or `ACTIVE`)
-- Protobuf + gRPC stub code generated via Maven (`protobuf-maven-plugin`)
+
+- gRPC billing account endpoint
+- Protobuf + gRPC code generation via Maven
 
 ### `analytics-service`
-- Kafka consumer on port `4002`
-- `@KafkaListener(topics="patient", groupId="analytics-service")` — offset: earliest
-- Deserializes Protobuf `PatientEvent` payloads from the `patient` topic
-- Stateless processing pipeline — no database
 
-## 📦 Repository Layout
+- Consumes Kafka events
+- Processes Protobuf payloads
+
+## Repository Layout (Complete)
 
 | Path | Purpose |
 |---|---|
-| `api-gateway/` | Gateway service — routing, rate limiting, JWT filter |
-| `auth-service/` | Authentication service and JWT token APIs |
-| `patient-service/` | Core patient domain service (most complex) |
+| `api-gateway/` | Gateway service for routing and edge concerns |
+| `auth-service/` | Authentication service and JWT APIs |
+| `patient-service/` | Core patient domain service |
 | `billing-service/` | gRPC billing service |
-| `analytics-service/` | Kafka consumer and analytics service |
-| `integration-tests/` | End-to-end tests (RestAssured + JUnit 5) |
+| `analytics-service/` | Kafka consumer/analytics service |
+| `integration-tests/` | End-to-end tests (RestAssured + JUnit) |
 | `performance-test/` | k6 load testing script (`patient-test.js`) |
 | `monitoring/` | Prometheus Dockerfile and scrape config |
 | `infrastructure/` | AWS CDK code + LocalStack deploy helper script |
 | `api-request/` | HTTP request collections for auth and patient APIs |
 | `grpc-request/` | gRPC request samples for billing service |
-| `docs/` | Architecture diagram and project assets |
 | `k8/` | Kubernetes manifests folder (currently empty placeholder) |
 | `Db_volumes/` | Local persisted Postgres volume data |
 | `.github/workflows/` | GitHub Actions CI workflows |
 | `docker-compose.yml` | Local full-system orchestration |
 | `Jenkinsfile` | Jenkins declarative pipeline |
 
-
-## 🏗️ Infrastructure
+## Infrastructure
 
 The `infrastructure/` module contains AWS CDK dependencies and generated CloudFormation templates in `infrastructure/cdk.out/`.
 
 `infrastructure/localstack-deploy.sh` deploys the generated template to LocalStack and prints the load balancer DNS. The script is Bash-based, so run it in a Bash-compatible shell.
 
-## 📝 Known Notes
+## Known Notes
 
 - `k8/` is present but currently empty
 - `Db_volumes/` contains local database volume data and is environment-specific

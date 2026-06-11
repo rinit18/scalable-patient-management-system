@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patient-service
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: patient-service
+  template:
+    metadata:
+      labels:
+        app: patient-service
+    spec:
+      containers:
+      - name: patient-service
+        image: patient-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 4000
+        env:
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: patient-management-config
+              key: PATIENT_DB_URL
+        - name: SPRING_DATASOURCE_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: patient-management-config
+              key: POSTGRES_USER
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: patient-management-secrets
+              key: POSTGRES_PASSWORD
+        - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+          value: "validate"
+        - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: patient-management-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: BILLING_SERVICE_ADDRESS
+          valueFrom:
+            configMapKeyRef:
+              name: patient-management-config
+              key: BILLING_SERVICE_ADDRESS
+        - name: BILLING_SERVICE_GRPC_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: patient-management-config
+              key: BILLING_SERVICE_GRPC_PORT
+        - name: SPRING_CACHE_TYPE
+          value: "redis"
+        - name: SPRING_DATA_REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: patient-management-config
+              key: REDIS_HOST
+        - name: SPRING_DATA_REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: patient-management-config
+              key: REDIS_PORT
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patient-service
+  namespace: default
+spec:
+  selector:
+    app: patient-service
+  ports:
+    - protocol: TCP
+      port: 4000
+      targetPort: 4000
